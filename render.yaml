@@ -16,5 +16,7 @@ services:
         value: pollinations
       - key: ADMIN_PASSWORD
         sync: false
+      - key: POLLINATIONS_API_KEY
+        sync: false
       - key: SESSION_SECRET
         generateValue: true

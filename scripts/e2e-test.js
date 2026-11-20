@@ -21,6 +21,7 @@ const child = spawn(process.execPath, ["src/server.js"], {
     DATA_DIR: dataDir,
     NODE_ENV: "test-run",
     XAI_API_KEY: "should-never-leak-to-browser",
+    POLLINATIONS_API_KEY: "sk_test_pollinations_should-never-leak",
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -78,12 +79,12 @@ async function waitForServer() {
   throw new Error(`Server did not start.\n${output}`);
 }
 
-async function req(jar, pathname, options = {}) {
+async function reqOn(targetPort, jar, pathname, options = {}) {
   const headers = { ...(options.headers || {}) };
   const cookie = jar.header();
   if (cookie) headers.Cookie = cookie;
   if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
-  const res = await fetch(`http://127.0.0.1:${port}${pathname}`, { ...options, headers });
+  const res = await fetch(`http://127.0.0.1:${targetPort}${pathname}`, { ...options, headers });
   jar.store(res);
   const text = await res.text();
   let json = null;
@@ -93,6 +94,38 @@ async function req(jar, pathname, options = {}) {
     json = null;
   }
   return { res, text, json };
+}
+
+function req(jar, pathname, options = {}) {
+  return reqOn(port, jar, pathname, options);
+}
+
+async function startIsolatedServer(env) {
+  const serverPort = await getFreePort();
+  const logs = { output: "" };
+  const proc = spawn(process.execPath, ["src/server.js"], {
+    cwd: root,
+    env: { ...process.env, ...env, PORT: String(serverPort) },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  proc.stdout.on("data", (d) => {
+    logs.output += d.toString();
+  });
+  proc.stderr.on("data", (d) => {
+    logs.output += d.toString();
+  });
+  const start = Date.now();
+  while (Date.now() - start < 15000) {
+    try {
+      const res = await fetch(`http://127.0.0.1:${serverPort}/api/health`);
+      if (res.ok) return { proc, port: serverPort, logs };
+    } catch {
+      /* retry */
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  proc.kill("SIGTERM");
+  throw new Error(`Isolated server did not start.\n${logs.output}`);
 }
 
 const results = [];
@@ -115,6 +148,9 @@ try {
 
   const user = cookieJar();
   const admin = cookieJar();
+  const owner = cookieJar();
+  let ownerMediaUrl = "";
+  const privateMessage = "التطبيق خاص حالياً، صنع الصور للمدير فقط";
 
   await check("default provider is pollinations when unset", async () => {
     const prev = process.env.PROVIDER;
@@ -140,6 +176,7 @@ try {
     assert.match(text, /dir="rtl"/);
     assert.match(text, /الاستوديو/);
     assert.match(text, /مقفل/);
+    assert.equal(text.includes("sk_test_pollinations_should-never-leak"), false);
   });
 
   await check("config has options, locked video, and no secrets", async () => {
@@ -153,9 +190,130 @@ try {
     assert.ok(json.allowedStyles.length);
     const blob = JSON.stringify(json);
     assert.equal(blob.includes("should-never-leak-to-browser"), false);
+    assert.equal(blob.includes("sk_test_pollinations_should-never-leak"), false);
     assert.equal(blob.includes(adminPassword), false);
     assert.equal(blob.includes("XAI_API_KEY"), false);
+    assert.equal(blob.includes("POLLINATIONS_API_KEY"), false);
+    assert.equal(json.pollinationsKeyed, false);
     assert.equal(json.quota.unlimited, false);
+    assert.equal(json.privateMode, true);
+    assert.equal(json.privateLocked, true);
+    assert.equal(json.privateNotice, privateMessage);
+  });
+
+  await check("non-admin is blocked while private mode is on", async () => {
+    const { res, json } = await req(user, "/api/generate", {
+      method: "POST",
+      body: JSON.stringify({
+        type: "image",
+        prompt: "واحة نجدية تحت سماء مليئة بالنجوم",
+        style: "سينمائي",
+        aspectRatio: "1:1",
+        resolution: "1k",
+        count: 1,
+      }),
+    });
+    assert.equal(res.status, 403);
+    assert.equal(json.ok, false);
+    assert.equal(json.error, privateMessage);
+    assert.equal(json.reason, "private");
+  });
+
+  await check("public page shows the private lock and an admin login link", async () => {
+    const { res, text } = await req(user, "/");
+    assert.equal(res.status, 200);
+    assert.match(text, /التطبيق خاص حالياً، صنع الصور للمدير فقط/);
+    assert.match(text, /id="privateNotice"/);
+    assert.match(text, /<a href="\/admin">تسجيل الدخول<\/a>/);
+    assert.match(text, /id="generateBtn"[^>]*disabled/);
+  });
+
+  await check("admin can generate while private mode is on", async () => {
+    const { res, json } = await req(owner, "/api/admin/login", {
+      method: "POST",
+      body: JSON.stringify({ password: adminPassword }),
+    });
+    assert.equal(res.status, 200, json?.error);
+    const adminCookie = (res.headers.getSetCookie?.() || []).find((c) => c.startsWith("admin="));
+    assert.ok(adminCookie, "admin cookie missing");
+    assert.match(adminCookie, /HttpOnly/);
+    assert.match(adminCookie, /SameSite=Lax/);
+    assert.match(adminCookie, /Max-Age=2592000/);
+    assert.doesNotMatch(adminCookie, /Secure/);
+    const cfg = await req(owner, "/api/config");
+    assert.equal(cfg.json.quota.isAdmin, true);
+    assert.equal(cfg.json.quota.unlimited, true);
+    assert.equal(cfg.json.privateMode, true);
+    assert.equal(cfg.json.privateLocked, false);
+    const gen = await req(owner, "/api/generate", {
+      method: "POST",
+      body: JSON.stringify({
+        type: "image",
+        prompt: "منارة خاصة للمدير لا تظهر للزوار",
+        style: "سينمائي",
+        aspectRatio: "1:1",
+        resolution: "1k",
+        count: 1,
+      }),
+    });
+    assert.equal(gen.res.status, 200, gen.json?.error);
+    assert.equal(gen.json.items.length, 1);
+    ownerMediaUrl = gen.json.items[0].url;
+    const own = await req(owner, ownerMediaUrl);
+    assert.equal(own.res.status, 200);
+  });
+
+  await check("admin moderation still applies in private mode", async () => {
+    const { res, json } = await req(owner, "/api/generate", {
+      method: "POST",
+      body: JSON.stringify({ type: "image", prompt: "nude erotic portrait", aspectRatio: "1:1", resolution: "1k" }),
+    });
+    assert.equal(res.status, 400);
+    assert.equal(json.reason, "sexual_content");
+  });
+
+  await check("non-admin cannot see or download another session's images", async () => {
+    const gallery = await req(user, "/api/gallery");
+    const blob = JSON.stringify(gallery.json);
+    assert.equal(blob.includes("منارة خاصة للمدير لا تظهر للزوار"), false);
+    assert.equal(blob.includes("sessionId"), false);
+    const media = await req(user, ownerMediaUrl);
+    assert.equal(media.res.status, 403);
+    assert.equal(media.text.includes("<svg"), false);
+    const stranger = cookieJar();
+    const stolen = await req(stranger, ownerMediaUrl);
+    assert.equal(stolen.res.status, 403);
+    assert.equal(stolen.text.includes("<svg"), false);
+  });
+
+  await check("turning private mode off restores public generation", async () => {
+    const saved = await req(owner, "/api/admin/settings", {
+      method: "PUT",
+      body: JSON.stringify({ privateMode: false }),
+    });
+    assert.equal(saved.res.status, 200, saved.json?.error);
+    assert.equal(saved.json.settings.privateMode, false);
+    const again = await req(owner, "/api/admin/settings");
+    assert.equal(again.json.settings.privateMode, false);
+    const cfg = await req(user, "/api/config");
+    assert.equal(cfg.json.privateMode, false);
+    assert.equal(cfg.json.privateLocked, false);
+    const visitor = cookieJar();
+    const gen = await req(visitor, "/api/generate", {
+      method: "POST",
+      body: JSON.stringify({
+        type: "image",
+        prompt: "حديقة عامة بعد فتح الوضع",
+        style: "بسيط",
+        aspectRatio: "1:1",
+        resolution: "1k",
+        count: 1,
+      }),
+    });
+    assert.equal(gen.res.status, 200, gen.json?.error);
+    assert.equal(gen.json.items.length, 1);
+    const own = await req(visitor, gen.json.items[0].url);
+    assert.equal(own.res.status, 200);
   });
 
   await check("generate mock image", async () => {
@@ -228,6 +386,7 @@ try {
     const { res, text } = await req(admin, "/admin");
     assert.equal(res.status, 200);
     assert.match(text, /لوحة الإدارة/);
+    assert.match(text, /وضع خاص: المدير فقط يقدر يصنع صور/);
   });
 
   await check("admin login rejects wrong password", async () => {
@@ -373,15 +532,80 @@ try {
     assert.ok(json.logs.length >= 5);
     assert.ok(json.logs.some((l) => l.status === "blocked"));
     assert.ok(json.logs.some((l) => l.status === "ok"));
+    assert.equal(JSON.stringify(json).includes("sk_test_pollinations_should-never-leak"), false);
   });
 
   await check("unauthenticated settings update is rejected", async () => {
     const stranger = cookieJar();
     const { res } = await req(stranger, "/api/admin/settings", {
       method: "PUT",
-      body: JSON.stringify({ imageEnabled: false }),
+      body: JSON.stringify({ imageEnabled: false, privateMode: false }),
     });
     assert.equal(res.status, 401);
+  });
+
+  await check("signed admin session survives a restart", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ivs-session-"));
+    const baseEnv = {
+      PROVIDER: "mock",
+      ADMIN_PASSWORD: adminPassword,
+      DATA_DIR: dir,
+      SESSION_SECRET: "test-session-secret-not-for-production",
+      NODE_ENV: "production",
+    };
+    let first;
+    let second;
+    try {
+      first = await startIsolatedServer(baseEnv);
+      const jar = cookieJar();
+      const login = await reqOn(first.port, jar, "/api/admin/login", {
+        method: "POST",
+        body: JSON.stringify({ password: adminPassword }),
+      });
+      assert.equal(login.res.status, 200, login.json?.error);
+      const adminCookie = (login.res.headers.getSetCookie?.() || []).find((c) => c.startsWith("admin="));
+      assert.ok(adminCookie, "admin cookie missing");
+      assert.match(adminCookie, /HttpOnly/);
+      assert.match(adminCookie, /Secure/);
+      assert.match(adminCookie, /Max-Age=2592000/);
+      const fresh = await reqOn(first.port, cookieJar(), "/api/config");
+      assert.equal(fresh.json.privateMode, true);
+      assert.equal(fresh.json.privateLocked, true);
+      first.proc.kill("SIGTERM");
+      await new Promise((r) => setTimeout(r, 250));
+      second = await startIsolatedServer(baseEnv);
+      const me = await reqOn(second.port, jar, "/api/admin/me");
+      assert.equal(me.res.status, 200);
+      assert.equal(me.json.authenticated, true);
+      const gen = await reqOn(second.port, jar, "/api/generate", {
+        method: "POST",
+        body: JSON.stringify({
+          type: "image",
+          prompt: "جلسة المدير بقيت بعد إعادة التشغيل",
+          style: "سينمائي",
+          aspectRatio: "1:1",
+          resolution: "1k",
+          count: 1,
+        }),
+      });
+      assert.equal(gen.res.status, 200, gen.json?.error);
+      const blocked = await reqOn(second.port, cookieJar(), "/api/generate", {
+        method: "POST",
+        body: JSON.stringify({
+          type: "image",
+          prompt: "زائر بعد إعادة التشغيل",
+          aspectRatio: "1:1",
+          resolution: "1k",
+        }),
+      });
+      assert.equal(blocked.res.status, 403);
+      assert.equal(blocked.json.reason, "private");
+      assert.equal(blocked.json.error, privateMessage);
+    } finally {
+      first?.proc.kill("SIGTERM");
+      second?.proc.kill("SIGTERM");
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 } finally {
   child.kill("SIGTERM");

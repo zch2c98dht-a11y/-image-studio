@@ -17,10 +17,12 @@ import {
   assertCanGenerate,
   getSettings,
   initStore,
+  galleryItemForFile,
   listGallery,
   logUsage,
   mediaPath,
   MEDIA_DIR,
+  PRIVATE_MODE_MESSAGE,
   publicConfig,
   updateSettings,
   getUsage,
@@ -89,10 +91,30 @@ app.get("/api/config", (req, res) => {
 });
 
 app.get("/api/gallery", (req, res) => {
-  res.json({ ok: true, items: listGallery(req.sessionId) });
+  const items = listGallery(req.sessionId).map(({ sessionId, ...rest }) => rest);
+  res.json({ ok: true, items });
 });
 
 app.post("/api/generate", async (req, res) => {
+  if (getSettings().privateMode && !req.isAdmin) {
+    const prompt = String(req.body?.prompt || "").trim();
+    logUsage({
+      id: crypto.randomUUID(),
+      sessionId: req.sessionId,
+      isAdmin: false,
+      type: req.body?.type === "video" ? "video" : "image",
+      prompt,
+      status: "blocked",
+      reason: "private",
+      message: PRIVATE_MODE_MESSAGE,
+    });
+    return res.status(403).json({
+      ok: false,
+      error: PRIVATE_MODE_MESSAGE,
+      reason: "private",
+    });
+  }
+
   const prompt = String(req.body?.prompt || "").trim();
   const settings = getSettings();
   let options;
@@ -243,6 +265,11 @@ app.get("/media/:file", (req, res) => {
   if (!filename || filename !== req.params.file || !fs.existsSync(filePath)) {
     return res.status(404).send("غير موجود");
   }
+  const item = galleryItemForFile(filename);
+  const ownsFile = item && (req.isAdmin || item.sessionId === req.sessionId);
+  if (!ownsFile) {
+    return res.status(403).type("text/plain; charset=utf-8").send("غير مسموح");
+  }
   if (req.query.download) {
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   } else {
@@ -281,6 +308,7 @@ app.get("/api/admin/settings", requireAdmin, (_req, res) => {
 app.put("/api/admin/settings", requireAdmin, (req, res) => {
   try {
     const allowed = [
+      "privateMode",
       "imageEnabled",
       "videoEnabled",
       "dailyImageLimit",

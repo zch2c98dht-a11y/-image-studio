@@ -219,14 +219,36 @@ input:focus, select:focus, textarea:focus {
   font-size: 13px;
 }
 
+.private-notice {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(232, 200, 114, 0.1);
+  color: var(--gold-2);
+  line-height: 1.7;
+}
+.private-notice a {
+  color: var(--gold);
+  font-weight: 800;
+  margin-inline-start: 6px;
+}
+.composer.is-private .mode-toggle,
+.composer.is-private .options,
+.composer.is-private .field,
+.composer.is-private #generateBtn {
+  opacity: 0.45;
+}
+
 .toggles { display: grid; gap: 10px; margin-bottom: 14px; }
 .switch {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   font-weight: 700;
+  line-height: 1.5;
 }
-.switch input { width: auto; accent-color: var(--gold); }
+.switch input { width: auto; accent-color: var(--gold); margin-top: 4px; flex: none; }
 
 .policy-banner {
   background: rgba(232, 200, 114, 0.08);

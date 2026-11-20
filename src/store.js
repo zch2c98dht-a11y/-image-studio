@@ -11,7 +11,10 @@ const SETTINGS_FILE = path.join(DATA_DIR, "settings.json");
 const USAGE_FILE = path.join(DATA_DIR, "usage.json");
 const GALLERY_FILE = path.join(DATA_DIR, "gallery.json");
 
+export const PRIVATE_MODE_MESSAGE = "التطبيق خاص حالياً، صنع الصور للمدير فقط";
+
 export const DEFAULT_SETTINGS = {
+  privateMode: true,
   imageEnabled: true,
   videoEnabled: false,
   dailyImageLimit: 10,
@@ -69,6 +72,7 @@ export function getSettings() {
 
 export function updateSettings(patch) {
   const next = { ...getSettings(), ...patch };
+  if (typeof next.privateMode !== "boolean") next.privateMode = !!next.privateMode;
   if (typeof next.imageEnabled !== "boolean") next.imageEnabled = !!next.imageEnabled;
   if (typeof next.videoEnabled !== "boolean") next.videoEnabled = !!next.videoEnabled;
   for (const key of ["dailyImageLimit", "dailyVideoLimit", "maxCount", "defaultDuration"]) {
@@ -160,6 +164,11 @@ export function getQuota(sessionId, isAdmin) {
 
 export function assertCanGenerate({ sessionId, isAdmin, type, count }) {
   const settings = getSettings();
+  if (settings.privateMode && !isAdmin) {
+    const err = new Error(PRIVATE_MODE_MESSAGE);
+    err.code = "private";
+    throw err;
+  }
   if (type === "image" && !settings.imageEnabled) {
     const err = new Error("إنشاء الصور موقوف حالياً من لوحة الإدارة.");
     err.code = "disabled";
@@ -251,13 +260,28 @@ export function mediaPath(filename) {
   return path.join(MEDIA_DIR, safe);
 }
 
+export function galleryItemForFile(filename) {
+  const safe = path.basename(String(filename || "").split("?")[0]);
+  if (!safe) return null;
+  const items = readJson(GALLERY_FILE, []);
+  for (let i = items.length - 1; i >= 0; i -= 1) {
+    const name = path.basename(String(items[i].url || "").split("?")[0]);
+    if (name === safe) return items[i];
+  }
+  return null;
+}
+
 export function publicConfig(sessionId, isAdmin) {
   const settings = getSettings();
   const quota = getQuota(sessionId, isAdmin);
   const provider = getProvider();
   const videoAvailable = !!settings.videoEnabled && !!provider.supportsVideo;
   const maxCount = provider.maxCount ? Math.min(quota.maxCount, provider.maxCount) : quota.maxCount;
+  const privateMode = settings.privateMode !== false;
   return {
+    privateMode,
+    privateLocked: privateMode && !isAdmin,
+    privateNotice: PRIVATE_MODE_MESSAGE,
     imageEnabled: settings.imageEnabled,
     videoEnabled: settings.videoEnabled,
     videoAvailable,

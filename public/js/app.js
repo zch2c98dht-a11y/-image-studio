@@ -38,8 +38,26 @@ function fillSelect(select, values, selected, labelFn = (v) => v) {
   }
 }
 
+function applyPrivateLock() {
+  const locked = !!config?.privateLocked;
+  const notice = document.getElementById("privateNotice");
+  const composer = document.querySelector(".composer");
+  if (notice) notice.hidden = !locked;
+  if (composer) composer.classList.toggle("is-private", locked);
+  for (const el of [els.prompt, els.style, els.aspectRatio, els.resolution, els.count, els.duration, els.generateBtn]) {
+    if (el) el.disabled = locked;
+  }
+  document.querySelectorAll(".mode").forEach((btn) => {
+    btn.disabled = locked;
+  });
+}
+
 function updateQuota(quota) {
   if (!quota) return;
+  if (config?.privateLocked) {
+    els.quotaBadge.textContent = "وضع خاص";
+    return;
+  }
   if (quota.unlimited || quota.isAdmin) {
     els.quotaBadge.textContent = quota.isAdmin ? "مدير · بلا حد يومي" : "بلا حد يومي";
     return;
@@ -152,6 +170,7 @@ async function load() {
   for (let i = 1; i <= (config.maxCount || 1); i += 1) counts.push(i);
   fillSelect(els.count, counts, 1);
   applyVideoLock();
+  applyPrivateLock();
   updateQuota(config.quota);
   applyMode();
   const gallery = await api("/api/gallery");
@@ -170,6 +189,10 @@ document.querySelectorAll(".mode").forEach((btn) => {
 });
 
 els.generateBtn.addEventListener("click", async () => {
+  if (config?.privateLocked) {
+    setStatus(config.privateNotice || "التطبيق خاص حالياً، صنع الصور للمدير فقط", "error");
+    return;
+  }
   const prompt = els.prompt.value.trim();
   if (!prompt) {
     setStatus("اكتب وصفاً أولاً.", "error");
@@ -197,7 +220,7 @@ els.generateBtn.addEventListener("click", async () => {
   } catch (err) {
     setStatus(err.message, "error");
   } finally {
-    els.generateBtn.disabled = false;
+    els.generateBtn.disabled = !!config?.privateLocked;
   }
 });
 

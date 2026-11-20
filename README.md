@@ -1,2 +1,133 @@
-# -image-studio
-تطبيق صنع صور مجاني
+# استوديو الصور والفيديو
+
+تطبيق ويب عربي صغير تستضيفه بنفسك لإنشاء صور بالذكاء الاصطناعي، **مجاناً وبدون مفتاح API**. الواجهة من اليمين لليسار ومصممة للجوال أولاً.
+
+صفحة المستخدم فيها وصف، اختيار أسلوب وأبعاد وحجم، ثم معرض مع تنزيل. الفيديو يظهر **مقفلاً / قريباً** في الإعداد المجاني، ولا يُفتح إلا إذا رُبط مزود مدفوع يدعم الفيديو (مثل xAI مع مفتاح). لوحة الإدارة على `/admin` محمية بكلمة سر تضعها أنت في متغيرات البيئة، والمدير بلا حد يومي مع بقاء سياسة المحتوى سارية عليه.
+
+## مهم قبل التشغيل
+
+- الإعداد الافتراضي يستخدم [Pollinations Classic API](https://github.com/pollinations/pollinations/blob/master/APIDOCS.md) للصور، بدون تسجيل وبدون مفتاح. الخدمة مجانية على أساس أفضل جهد، وحدّها: **صورة واحدة كل 45 ثانية تقريباً لكل عنوان IP**، وأكبر مساحة للصورة 768×768. الصور تأتي بصيغة JPEG وقد يظهر شعار صغير في الزاوية.
+- إذا تجاوزت الحد يعيد المزود رمز 402 مع وقت الانتظار. التطبيق يعرض هذه الرسالة بالعربية.
+- الفيديو غير متاح في الخطة المجانية. لفتحه تحتاج مزوداً مدفوعاً (`PROVIDER=xai` مع `XAI_API_KEY`) ثم تفعيل الفيديو من لوحة الإدارة. هذا اختياري ومدفوع.
+- وضع المدير يرفع حدود التطبيق فقط (العدد اليومي). **لا يتجاوز سياسة المحتوى** ولا قواعد المزود.
+- التطبيق يمنع طلبات المحتوى الجنسي وطلبات المشاهير أو الأشخاص الحقيقيين المعروفين عبر خطاف حظر أساسي، ثم يعتمد أيضاً على فلاتر المزود (`safe=true` مع Pollinations).
+- لا تضع كلمات سر في الشات أو في الملفات المرفوعة للعامة. استخدم ملف `.env` أو إعدادات الاستضافة فقط.
+- صفحات GitHub Pages لا تشغّل خادماً، لذلك انشر على Render (خطة مجانية) أو Railway.
+
+## المتطلبات
+
+- Node.js 18 أو أحدث
+- للتجربة المحلية: لا تحتاج مفتاحاً إذا استخدمت `PROVIDER=pollinations` أو `PROVIDER=mock`
+- للفيديو أو جودة أعلى: مفتاح [xAI API](https://docs.x.ai/developers/quickstart) اختياري ومدفوع
+
+## الإعداد المحلي
+
+```bash
+cp .env.example .env
+```
+
+عدّل `.env`:
+
+```bash
+PORT=3000
+PROVIDER=pollinations
+ADMIN_PASSWORD=change-me-before-deploy
+```
+
+- `PROVIDER=pollinations` هو الافتراضي: صور مجانية بدون مفتاح.
+- `PROVIDER=mock` يجرب الواجهة بدون شبكة ويعيد صوراً وفيديوهات تجريبية (مفيد للاختبارات).
+- `PROVIDER=xai` مزود مدفوع اختياري ويحتاج `XAI_API_KEY`.
+- `ADMIN_PASSWORD` كلمة سر لوحة الإدارة. غيّر القيمة الافتراضية قبل النشر، ولا تضع كلمة السر الحقيقية داخل المستودع.
+- `SESSION_SECRET` اختياري لكنه مستحسن في الإنتاج.
+
+ثم:
+
+```bash
+npm install
+npm start
+```
+
+افتح [http://localhost:3000](http://localhost:3000) ولوحة الإدارة على [http://localhost:3000/admin](http://localhost:3000/admin).
+
+للتجربة الآلية (وضع تجريبي بدون استدعاء الشبكة):
+
+```bash
+PROVIDER=mock ADMIN_PASSWORD=change-me-before-deploy npm test
+```
+
+## متغيرات البيئة
+
+| المتغير | الغرض |
+| --- | --- |
+| `PORT` | منفذ الخادم (افتراضي 3000) |
+| `PROVIDER` | `pollinations` (افتراضي، مجاني) أو `mock` أو `xai` أو `openai` (الأخير واجهة غير مكتملة) |
+| `ADMIN_PASSWORD` | كلمة سر `/admin` |
+| `XAI_API_KEY` | مفتاح xAI إذا اخترت المزود المدفوع. يبقى على الخادم ولا يُرسل للمتصفح |
+| `SESSION_SECRET` | لتوقيع جلسة المدير |
+| `XAI_IMAGE_MODEL` | افتراضي `grok-imagine-image-2.0` |
+| `XAI_VIDEO_MODEL` | افتراضي `grok-imagine-video-1.5` |
+| `DATA_DIR` | مجلد البيانات (افتراضي `./data`) |
+| `EXTRA_BLOCKLIST` | أنماط حظر إضافية مفصولة بفاصلة |
+
+## مزود الصور المجاني (Pollinations)
+
+- الطلب: `GET https://image.pollinations.ai/prompt/{الوصف المرمّز}` مع `width` و`height` و`seed` و`safe=true`
+- المصدر: [APIDOCS.md في مستودع Pollinations](https://github.com/pollinations/pollinations/blob/master/APIDOCS.md) (Classic API)
+- بدون مفتاح وبدون حساب. الحد: صورة واحدة في كل مرة، وبفاصل 45 ثانية على الأقل لكل IP. عند التجاوز: HTTP 402 و`Retry-After`.
+- المسار الحديث `https://gen.pollinations.ai/image/...` يحتاج مفتاحاً للطلبات الجديدة، لذلك لا يُستخدم كخيار مجاني هنا.
+
+## واجهات xAI الاختيارية (مدفوعة)
+
+الصور:
+
+- `POST https://api.x.ai/v1/images/generations`
+- النموذج: `grok-imagine-image-2.0`
+- المصدر: [مرجع الصور](https://docs.x.ai/developers/rest-api-reference/inference/images) و[نظرة عامة](https://docs.x.ai/developers/model-capabilities/imagine)
+
+الفيديو:
+
+- `POST https://api.x.ai/v1/videos/generations` ثم استطلاع `GET https://api.x.ai/v1/videos/{request_id}`
+- النموذج: `grok-imagine-video-1.5`
+- المصدر: [مرجع الفيديو](https://docs.x.ai/developers/rest-api-reference/inference/videos) و[إنشاء الفيديو](https://docs.x.ai/developers/model-capabilities/video/generation)
+
+## النشر المجاني من الآيفون (Render)
+
+GitHub Pages لا تكفي لأنها تستضيف ملفات ثابتة فقط. الخطة المجانية في Render تشغّل الخادم، وقد تدخل الخدمة في سبات بعد فترة خمول؛ **أول فتح بعدها بطيء (cold start)** وقد يستغرق نصف دقيقة أو أكثر.
+
+### 1) ارفع المشروع إلى GitHub
+
+من سفاري على الآيفون:
+
+1. ادخل إلى [github.com](https://github.com) وسجّل الدخول أو أنشئ حساباً.
+2. اضغط **New** لإنشاء مستودع جديد (يمكن أن يكون عاماً أو خاصاً).
+3. ارفع ملفات المشروع (من الكمبيوتر أو عبر رفع الملفات إلى المستودع). لا ترفع مجلد `node_modules` ولا ملف `.env` ولا مجلد `data`. الملف `render.yaml` يجب أن يكون في جذر المستودع.
+
+إذا كان GitHub مربوطاً هنا، يمكن أن أرفع المشروع عنك بعد موافقتك.
+
+### 2) أنشئ الخدمة من Blueprint
+
+1. ادخل إلى [dashboard.render.com](https://dashboard.render.com) وأنشئ حساباً (يوجد خيار مجاني).
+2. اربط حساب GitHub إذا طُلب منك.
+3. اختر **New** ثم **Blueprint**.
+4. اختر مستودع المشروع. Render يقرأ ملف `render.yaml`.
+5. عند الطلب، اكتب كلمة سر الإدارة في `ADMIN_PASSWORD` (لا تشاركها). `PROVIDER` مضبوط مسبقاً على `pollinations` ولا يحتاج مفتاحاً.
+6. أطلق النشر وانتظر حتى يصبح الحالة Live، ثم افتح رابط `.onrender.com`.
+
+الخطة المجانية قد تُوقف الخدمة بعد الخمول. إذا فتحته وانتظر تحميلاً طويلاً في أول مرة، هذا طبيعي؛ حدّث الصفحة بعد انتهاء الإقلاع.
+
+### Railway (بديل)
+
+يمكنك أيضاً إنشاء مشروع من المستودع في [Railway](https://railway.app)، وضبط `PROVIDER=pollinations` و`ADMIN_PASSWORD`، وأمر التشغيل `npm start`.
+
+## هيكل سريع
+
+- `src/server.js` الخادم وواجهات API
+- `src/providers/` مزودات pollinations و xAI و mock و OpenAI
+- `src/moderation.js` خطاف حظر المحتوى
+- `public/` الواجهة العربية
+- `render.yaml` مخطط النشر المجاني على Render
+- `data/` الإعدادات والسجلات والملفات الناتجة (لا تُرفع للمستودع)
+
+## تنبيه قانوني
+
+أنت المسؤول عن ما يُنشر عبر نسختك، وعن أي مفتاح مدفوع تضيفه لاحقاً. لا تستخدم التطبيق لإنتاج محتوى جنسي أو صور أشخاص حقيقيين أو مواد محمية دون حق. خدمة Pollinations لها [شروط استخدام](https://pollinations.ai/terms) خاصة بها، وهي خدمة خارجية قد تتغير حدودها أو تتوقف.

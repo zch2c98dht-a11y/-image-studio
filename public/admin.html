@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#070b16" />
+    <title>لوحة الإدارة — الاستوديو</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body>
+    <div class="stars" aria-hidden="true"></div>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">إدارة الاستوديو</p>
+        <h1>لوحة التحكم</h1>
+      </div>
+      <div class="top-actions">
+        <a class="ghost-link" href="/">صفحة المستخدم</a>
+        <button type="button" id="logoutBtn" class="ghost-link hidden">خروج</button>
+      </div>
+    </header>
+
+    <main class="shell">
+      <section id="loginCard" class="card">
+        <h2>دخول المدير</h2>
+        <p class="hint">كلمة السر تُقرأ من متغير البيئة ADMIN_PASSWORD على الخادم، وليست محفوظة في التطبيق.</p>
+        <label class="field">
+          <span>كلمة السر</span>
+          <input id="password" type="password" autocomplete="current-password" />
+        </label>
+        <button type="button" id="loginBtn" class="primary">دخول</button>
+        <p id="loginStatus" class="status" hidden></p>
+      </section>
+
+      <section id="adminApp" class="hidden">
+        <p class="policy-banner" id="policyBanner"></p>
+
+        <section class="card">
+          <h2>الإعدادات</h2>
+          <div class="toggles">
+            <label class="switch"><input type="checkbox" id="imageEnabled" /> تفعيل الصور</label>
+            <label class="switch"><input type="checkbox" id="videoEnabled" /> تفعيل الفيديو</label>
+            <p class="hint" id="videoToggleHint">الفيديو مقفل في الإعداد المجاني حتى يتوفر مزود مدفوع يدعمه مثل xAI.</p>
+          </div>
+          <div class="options">
+            <label class="field">
+              <span>الحد اليومي للصور (0 = بدون حد للمستخدمين)</span>
+              <input id="dailyImageLimit" type="number" min="0" step="1" />
+            </label>
+            <label class="field">
+              <span>الحد اليومي للفيديو (0 = بدون حد للمستخدمين)</span>
+              <input id="dailyVideoLimit" type="number" min="0" step="1" />
+            </label>
+            <label class="field">
+              <span>أقصى عدد صور في الطلب الواحد للمستخدم</span>
+              <input id="maxCount" type="number" min="1" max="10" step="1" />
+            </label>
+          </div>
+          <label class="field">
+            <span>الأساليب المسموحة (سطر لكل أسلوب)</span>
+            <textarea id="allowedStyles" rows="6"></textarea>
+          </label>
+          <label class="field">
+            <span>الأبعاد المسموحة (مفصولة بفاصلة)</span>
+            <input id="allowedAspectRatios" type="text" />
+          </label>
+          <label class="field">
+            <span>الأحجام المسموحة (مفصولة بفاصلة، مثل 1k, 2k)</span>
+            <input id="allowedResolutions" type="text" />
+          </label>
+          <label class="field">
+            <span>مدد الفيديو بالثواني (مفصولة بفاصلة، من 1 إلى 15)</span>
+            <input id="allowedDurations" type="text" />
+          </label>
+          <button type="button" id="saveBtn" class="primary">حفظ الإعدادات</button>
+          <p id="saveStatus" class="status" hidden></p>
+          <p class="hint">المدير بلا حدود يومية عند الاستخدام من صفحة الاستوديو بعد تسجيل الدخول. حد المزود للصورة الواحدة يبقى 10 كحد أقصى لكل طلب.</p>
+        </section>
+
+        <section class="card">
+          <div class="section-head">
+            <h2>سجل الاستخدام</h2>
+            <button type="button" id="refreshLogs" class="ghost-link">تحديث</button>
+          </div>
+          <div id="logs" class="logs"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/js/admin.js" type="module"></script>
+  </body>
+</html>

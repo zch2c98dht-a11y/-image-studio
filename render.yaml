@@ -1,0 +1,20 @@
+# مخطط Render للخطة المجانية.
+# من الجوال: ارفع المشروع إلى GitHub ثم في Render اختر New > Blueprint.
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: image-video-studio
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PROVIDER
+        value: pollinations
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true

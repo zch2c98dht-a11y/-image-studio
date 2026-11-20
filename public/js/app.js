@@ -92,7 +92,11 @@ function applyVideoLock() {
     ];
     if (config.videoLocked) parts.push(config.videoLockHint || "الفيديو مقفل / قريباً.");
     if (config.provider === "pollinations") {
-      parts.push("المزود المجاني: صورة واحدة كل 45 ثانية تقريباً، وأكبر حجم 768 بكسل.");
+      parts.push(
+        config.pollinationsKeyed
+          ? "النموذج المجاني flux مفعّل بمفتاح الخادم، وحتى 1024 بكسل. المدير يستطيع أكثر من صورة في الطلب."
+          : "المزود المجاني: صورة واحدة كل 45 ثانية تقريباً، وأكبر حجم 768 بكسل.",
+      );
     }
     els.composerHint.textContent = parts.join(" ");
   }

@@ -46,6 +46,15 @@ app.use((req, res, next) => {
   next();
 });
 
+function redactSecrets(text) {
+  let out = String(text || "");
+  for (const name of ["POLLINATIONS_API_KEY", "XAI_API_KEY", "ADMIN_PASSWORD", "SESSION_SECRET"]) {
+    const secret = String(process.env[name] || "").trim();
+    if (secret) out = out.split(secret).join("[redacted]");
+  }
+  return out;
+}
+
 function stylePrompt(prompt, style) {
   const s = String(style || "").trim();
   if (!s) return prompt;
@@ -248,12 +257,12 @@ app.post("/api/generate", async (req, res) => {
       duration: options.type === "video" ? options.duration : null,
       status: "error",
       reason: err.code || "provider",
-      message: err.message,
+      message: redactSecrets(err.message),
     });
     const status = err.code === "not_configured" || err.code === "not_implemented" ? 501 : 502;
     res.status(status).json({
       ok: false,
-      error: err.message || "تعذر الإنشاء حالياً.",
+      error: redactSecrets(err.message || "تعذر الإنشاء حالياً."),
       reason: err.code || "provider",
     });
   }

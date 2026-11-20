@@ -192,7 +192,7 @@ export function assertCanGenerate({ sessionId, isAdmin, type, count }) {
   const provider = getProvider();
   if (provider.maxCount && n > provider.maxCount) {
     const err = new Error(
-      provider.id === "pollinations"
+      provider.id === "pollinations" && provider.maxCount === 1
         ? "المزود المجاني ينشئ صورة واحدة في كل طلب، وبفاصل حوالي 45 ثانية."
         : `الحد الأقصى لهذا المزود في الطلب الواحد هو ${provider.maxCount}.`,
     );
@@ -302,6 +302,7 @@ export function publicConfig(sessionId, isAdmin) {
     maxCount,
     quota: { ...quota, maxCount },
     provider: providerName(),
+    pollinationsKeyed: provider.id === "pollinations" && Boolean(String(process.env.POLLINATIONS_API_KEY || "").trim()),
     policy:
       "سياسة المحتوى تُطبَّق على الجميع. وضع المدير يرفع حدود الاستخدام فقط ولا يتجاوز قواعد المحتوى أو مزود الذكاء الاصطناعي.",
   };

@@ -21,6 +21,7 @@ const child = spawn(process.execPath, ["src/server.js"], {
     DATA_DIR: dataDir,
     NODE_ENV: "test-run",
     XAI_API_KEY: "should-never-leak-to-browser",
+    POLLINATIONS_API_KEY: "sk_test_pollinations_should-never-leak",
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -175,6 +176,7 @@ try {
     assert.match(text, /dir="rtl"/);
     assert.match(text, /الاستوديو/);
     assert.match(text, /مقفل/);
+    assert.equal(text.includes("sk_test_pollinations_should-never-leak"), false);
   });
 
   await check("config has options, locked video, and no secrets", async () => {
@@ -188,8 +190,11 @@ try {
     assert.ok(json.allowedStyles.length);
     const blob = JSON.stringify(json);
     assert.equal(blob.includes("should-never-leak-to-browser"), false);
+    assert.equal(blob.includes("sk_test_pollinations_should-never-leak"), false);
     assert.equal(blob.includes(adminPassword), false);
     assert.equal(blob.includes("XAI_API_KEY"), false);
+    assert.equal(blob.includes("POLLINATIONS_API_KEY"), false);
+    assert.equal(json.pollinationsKeyed, false);
     assert.equal(json.quota.unlimited, false);
     assert.equal(json.privateMode, true);
     assert.equal(json.privateLocked, true);
@@ -527,6 +532,7 @@ try {
     assert.ok(json.logs.length >= 5);
     assert.ok(json.logs.some((l) => l.status === "blocked"));
     assert.ok(json.logs.some((l) => l.status === "ok"));
+    assert.equal(JSON.stringify(json).includes("sk_test_pollinations_should-never-leak"), false);
   });
 
   await check("unauthenticated settings update is rejected", async () => {

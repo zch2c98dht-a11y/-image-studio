@@ -64,6 +64,8 @@ PROVIDER=mock ADMIN_PASSWORD=change-me-before-deploy npm test
 | `PORT` | منفذ الخادم (افتراضي 3000) |
 | `PROVIDER` | `pollinations` (افتراضي، مجاني) أو `mock` أو `xai` أو `openai` (الأخير واجهة غير مكتملة) |
 | `ADMIN_PASSWORD` | كلمة سر `/admin` |
+| `POLLINATIONS_API_KEY` | اختياري. مفتاح سري على الخادم فقط. إذا وُجد يُستخدم `gen.pollinations.ai` مع النموذج المجاني `flux`. لا يُرسل للمتصفح ولا يُكتب في الرابط |
+| `POLLINATIONS_MODEL` | اختياري. الافتراضي `flux` (مجاني). القيم المسموحة: `flux` أو `black-forest-labs/flux.1-schnell` |
 | `XAI_API_KEY` | مفتاح xAI إذا اخترت المزود المدفوع. يبقى على الخادم ولا يُرسل للمتصفح |
 | `SESSION_SECRET` | لتوقيع جلسة المدير |
 | `XAI_IMAGE_MODEL` | افتراضي `grok-imagine-image-2.0` |
@@ -73,10 +75,9 @@ PROVIDER=mock ADMIN_PASSWORD=change-me-before-deploy npm test
 
 ## مزود الصور المجاني (Pollinations)
 
-- الطلب: `GET https://image.pollinations.ai/prompt/{الوصف المرمّز}` مع `width` و`height` و`seed` و`safe=true`
-- المصدر: [APIDOCS.md في مستودع Pollinations](https://github.com/pollinations/pollinations/blob/master/APIDOCS.md) (Classic API)
-- بدون مفتاح وبدون حساب. الحد: صورة واحدة في كل مرة، وبفاصل 45 ثانية على الأقل لكل IP. عند التجاوز: HTTP 402 و`Retry-After`.
-- المسار الحديث `https://gen.pollinations.ai/image/...` يحتاج مفتاحاً للطلبات الجديدة، لذلك لا يُستخدم كخيار مجاني هنا.
+- بدون مفتاح: `GET https://image.pollinations.ai/prompt/{الوصف المرمّز}` مع `width` و`height` و`seed` و`safe=true`. صورة واحدة كل 45 ثانية تقريباً، وأطول ضلع 768.
+- مع `POLLINATIONS_API_KEY`: `GET https://gen.pollinations.ai/image/{الوصف المرمّز}` وترويسة `Authorization: Bearer`. المفتاح لا يوضع في الرابط. النموذج الافتراضي المجاني هو `flux`، والحجم حتى 1024، والمدير يستطيع عدة صور في الطلب (طلب لكل صورة لأن الواجهة تقبل صورة واحدة في كل استدعاء). أخطاء JSON مثل 401 و402 لا تُحفظ كصور.
+- المصدر: [وثائق gen.pollinations.ai](https://gen.pollinations.ai/docs) و[APIDOCS.md](https://github.com/pollinations/pollinations/blob/master/APIDOCS.md).
 
 ## واجهات xAI الاختيارية (مدفوعة)
 

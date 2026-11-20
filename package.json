@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node src/server.js",
-    "test": "node scripts/pollinations-provider-test.js && node scripts/e2e-test.js"
+    "test": "node scripts/pollinations-provider-test.js && node scripts/prompt-prep-test.js && node scripts/e2e-test.js"
   },
   "dependencies": {
     "express": "^4.21.2"

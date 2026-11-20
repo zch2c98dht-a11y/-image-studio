@@ -37,6 +37,7 @@ function listFrom(text) {
 
 function fillSettings(settings) {
   document.getElementById("privateMode").checked = settings.privateMode !== false;
+  document.getElementById("enhancePrompts").checked = settings.enhancePrompts !== false;
   document.getElementById("imageEnabled").checked = !!settings.imageEnabled;
   document.getElementById("videoEnabled").checked = !!settings.videoEnabled;
   document.getElementById("dailyImageLimit").value = settings.dailyImageLimit;
@@ -148,6 +149,7 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
       method: "PUT",
       body: JSON.stringify({
         privateMode: document.getElementById("privateMode").checked,
+        enhancePrompts: document.getElementById("enhancePrompts").checked,
         imageEnabled: document.getElementById("imageEnabled").checked,
         videoEnabled: document.getElementById("videoEnabled").checked,
         dailyImageLimit: Number(document.getElementById("dailyImageLimit").value),

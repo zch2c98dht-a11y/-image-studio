@@ -112,28 +112,36 @@ async function renderMockVideo({ prompt, aspectRatio, duration }) {
     } catch {
       /* ignore */
     }
-    // فيديو بديل قصير جداً إذا تعذر ffmpeg مع النص
     const fallback = path.join(os.tmpdir(), `ivs-fb-${crypto.randomUUID()}.mp4`);
-    await execFileAsync(
-      "ffmpeg",
-      [
-        "-y",
-        "-f",
-        "lavfi",
-        "-i",
-        `color=c=0x0b1730:s=640x360:d=${seconds}:r=12`,
-        "-pix_fmt",
-        "yuv420p",
-        "-movflags",
-        "+faststart",
-        "-an",
-        fallback,
-      ],
-      { timeout: 20000 },
-    );
-    const buffer = fs.readFileSync(fallback);
-    fs.unlinkSync(fallback);
-    return buffer;
+    try {
+      await execFileAsync(
+        "ffmpeg",
+        [
+          "-y",
+          "-f",
+          "lavfi",
+          "-i",
+          `color=c=0x0b1730:s=640x360:d=${seconds}:r=12`,
+          "-pix_fmt",
+          "yuv420p",
+          "-movflags",
+          "+faststart",
+          "-an",
+          fallback,
+        ],
+        { timeout: 20000 },
+      );
+      const buffer = fs.readFileSync(fallback);
+      fs.unlinkSync(fallback);
+      return buffer;
+    } catch {
+      try {
+        fs.unlinkSync(fallback);
+      } catch {
+        /* ignore */
+      }
+      return Buffer.from("ivs-mock-video-without-ffmpeg");
+    }
   }
 }
 

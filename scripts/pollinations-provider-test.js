@@ -63,15 +63,37 @@ try {
     const parsed = new URL(calls[0].url);
     assert.equal(parsed.origin, "https://image.pollinations.ai");
     assert.equal(parsed.pathname.startsWith("/prompt/"), true);
-    assert.equal(parsed.searchParams.get("width"), "768");
-    assert.equal(parsed.searchParams.get("height"), "768");
+    assert.equal(parsed.searchParams.get("width"), "1024");
+    assert.equal(parsed.searchParams.get("height"), "1024");
+    assert.equal(parsed.searchParams.get("enhance"), null);
     assert.equal(parsed.searchParams.get("safe"), "true");
     assert.equal(parsed.searchParams.get("model"), null);
     assert.equal(parsed.searchParams.has("key"), false);
     assert.equal(calls[0].options.headers.Authorization, undefined);
     assert.equal(calls[0].url.includes(secret), false);
     assert.equal(pollinationsProvider.maxCount, 1);
-    assert.deepEqual(pollinationsSize("1:1"), { width: 768, height: 768 });
+    assert.deepEqual(pollinationsSize("1:1"), { width: 1024, height: 1024 });
+  });
+
+  await check("classic route sends enhance=true at the free 1024 size", async () => {
+    delete process.env.POLLINATIONS_API_KEY;
+    const calls = [];
+    globalThis.fetch = async (url) => {
+      calls.push(String(url));
+      return pngResponse();
+    };
+    await pollinationsProvider.generateImage({
+      prompt: "a lantern",
+      aspectRatio: "1:1",
+      n: 1,
+      enhance: true,
+    });
+    const parsed = new URL(calls[0]);
+    assert.equal(parsed.origin, "https://image.pollinations.ai");
+    assert.equal(parsed.searchParams.get("enhance"), "true");
+    assert.equal(parsed.searchParams.get("width"), "1024");
+    assert.equal(parsed.searchParams.get("height"), "1024");
+    assert.equal(calls[0].includes("sk_"), false);
   });
 
   await check("keyless provider rejects multiple images before any request", async () => {
@@ -124,6 +146,17 @@ try {
       assert.equal(blob.includes(secret), false);
     }
     assert.equal(seeds.size, 2);
+    await pollinationsProvider.generateImage({
+      prompt: "a lantern",
+      aspectRatio: "1:1",
+      n: 1,
+      enhance: true,
+    });
+    const keyedEnhanced = new URL(calls.at(-1).url);
+    assert.equal(keyedEnhanced.origin, "https://gen.pollinations.ai");
+    assert.equal(keyedEnhanced.searchParams.get("enhance"), null);
+    assert.equal(keyedEnhanced.searchParams.get("width"), "1024");
+    assert.equal(calls.at(-1).url.includes(secret), false);
   });
 
   await check("explicit free model alias is sent and paid models are not called", async () => {

@@ -6,7 +6,7 @@
 
 ## مهم قبل التشغيل
 
-- الإعداد الافتراضي يستخدم [Pollinations Classic API](https://github.com/pollinations/pollinations/blob/master/APIDOCS.md) للصور، بدون تسجيل وبدون مفتاح. الخدمة مجانية على أساس أفضل جهد، وحدّها: **صورة واحدة كل 45 ثانية تقريباً لكل عنوان IP**، وأكبر مساحة للصورة 768×768. الصور تأتي بصيغة JPEG وقد يظهر شعار صغير في الزاوية.
+- الإعداد الافتراضي يستخدم [Pollinations Classic API](https://github.com/pollinations/pollinations/blob/master/APIDOCS.md) للصور، بدون تسجيل وبدون مفتاح. الخدمة مجانية على أساس أفضل جهد، وحدّها: **صورة واحدة كل 45 ثانية تقريباً لكل عنوان IP**، وأكبر مساحة مطلوبة للصورة 1024×1024. الصور تأتي بصيغة JPEG وقد يظهر شعار صغير في الزاوية.
 - إذا تجاوزت الحد يعيد المزود رمز 402 مع وقت الانتظار. التطبيق يعرض هذه الرسالة بالعربية.
 - الفيديو غير متاح في الخطة المجانية. لفتحه تحتاج مزوداً مدفوعاً (`PROVIDER=xai` مع `XAI_API_KEY`) ثم تفعيل الفيديو من لوحة الإدارة. هذا اختياري ومدفوع.
 - الوضع الخاص (`privateMode`) مفعّل افتراضياً ويُحفظ في `data/settings.json`. على Render القرص مؤقت، لذلك يبقى الافتراضي «مفعّل» حتى لا يُفتح التطبيق للعامة إذا ضاع الملف بعد إعادة التشغيل. أوقف الخيار «وضع خاص: المدير فقط يقدر يصنع صور» من لوحة الإدارة إذا أردت صفحة عامة.
@@ -66,6 +66,7 @@ PROVIDER=mock ADMIN_PASSWORD=change-me-before-deploy npm test
 | `ADMIN_PASSWORD` | كلمة سر `/admin` |
 | `POLLINATIONS_API_KEY` | اختياري. مفتاح سري على الخادم فقط. إذا وُجد يُستخدم `gen.pollinations.ai` مع النموذج المجاني `flux`. لا يُرسل للمتصفح ولا يُكتب في الرابط |
 | `POLLINATIONS_MODEL` | اختياري. الافتراضي `flux` (مجاني). القيم المسموحة: `flux` أو `black-forest-labs/flux.1-schnell` |
+| `POLLINATIONS_TEXT_MODEL` | اختياري. نموذج النص المجاني لترجمة الوصف وتحسينه. الافتراضي `openai/gpt-5-nano` |
 | `XAI_API_KEY` | مفتاح xAI إذا اخترت المزود المدفوع. يبقى على الخادم ولا يُرسل للمتصفح |
 | `SESSION_SECRET` | لتوقيع جلسة المدير |
 | `XAI_IMAGE_MODEL` | افتراضي `grok-imagine-image-2.0` |
@@ -75,7 +76,8 @@ PROVIDER=mock ADMIN_PASSWORD=change-me-before-deploy npm test
 
 ## مزود الصور المجاني (Pollinations)
 
-- بدون مفتاح: `GET https://image.pollinations.ai/prompt/{الوصف المرمّز}` مع `width` و`height` و`seed` و`safe=true`. صورة واحدة كل 45 ثانية تقريباً، وأطول ضلع 768.
+- بدون مفتاح: `GET https://image.pollinations.ai/prompt/{الوصف المرمّز}` مع `width` و`height` و`seed` و`safe=true` و`enhance=true` عندما يكون تحسين الوصف مفعّلاً. صورة واحدة كل 45 ثانية تقريباً، وأطول ضلع 1024.
+- الوصف العربي أو أي وصف بغير الحروف اللاتينية يُترجم إلى الإنجليزية قبل المزود. ومع «تحسين الوصف تلقائياً» (الافتراضي) تُعاد صياغته في نفس الطلب إلى وصف إنجليزي مفصل. إذا فشلت الترجمة يُستخدم النص الأصلي، ولا يتوقف الإنشاء.
 - مع `POLLINATIONS_API_KEY`: `GET https://gen.pollinations.ai/image/{الوصف المرمّز}` وترويسة `Authorization: Bearer`. المفتاح لا يوضع في الرابط. النموذج الافتراضي المجاني هو `flux`، والحجم حتى 1024، والمدير يستطيع عدة صور في الطلب (طلب لكل صورة لأن الواجهة تقبل صورة واحدة في كل استدعاء). أخطاء JSON مثل 401 و402 لا تُحفظ كصور.
 - المصدر: [وثائق gen.pollinations.ai](https://gen.pollinations.ai/docs) و[APIDOCS.md](https://github.com/pollinations/pollinations/blob/master/APIDOCS.md).
 

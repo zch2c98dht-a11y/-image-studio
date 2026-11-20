@@ -212,6 +212,14 @@ input:focus, select:focus, textarea:focus {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.tile .prompt-en {
+  color: var(--gold-2);
+  font-size: 11px;
+  line-height: 1.45;
+  direction: ltr;
+  text-align: start;
+  -webkit-line-clamp: 4;
+}
 .tile a {
   color: var(--gold);
   font-weight: 700;

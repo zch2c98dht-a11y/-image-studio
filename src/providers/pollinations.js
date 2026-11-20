@@ -3,7 +3,7 @@
  *
  * Without POLLINATIONS_API_KEY: classic keyless route
  *   GET https://image.pollinations.ai/prompt/{prompt}?width&height&seed&safe
- *   one image, about 45s apart, longest edge 768.
+ *   one image, about 45s apart, longest edge 1024.
  *
  * With POLLINATIONS_API_KEY: authenticated route
  *   GET https://gen.pollinations.ai/image/{prompt}
@@ -16,7 +16,7 @@
 
 const CLASSIC_BASE = "https://image.pollinations.ai/prompt";
 const GEN_BASE = "https://gen.pollinations.ai/image";
-const CLASSIC_MAX_EDGE = 768;
+const CLASSIC_MAX_EDGE = 1024;
 const KEYED_MAX_EDGE = 1024;
 const DEFAULT_MODEL = "flux";
 const FREE_MODELS = new Set(["flux", "black-forest-labs/flux.1-schnell"]);
@@ -106,9 +106,9 @@ function randomSeed() {
   return Math.floor(Math.random() * 1_000_000_000);
 }
 
-async function requestImage({ prompt, aspectRatio, key }) {
+async function requestImage({ prompt, aspectRatio, key, enhance }) {
   const keyed = Boolean(key);
-  const { width, height } = pollinationsSize(aspectRatio, { keyed });
+  const { width, height } = pollinationsSize(aspectRatio, { keyed: keyed || Boolean(enhance) });
   const seed = randomSeed();
   const base = keyed ? GEN_BASE : CLASSIC_BASE;
   const url = new URL(`${base}/${encodeURIComponent(prompt)}`);
@@ -116,6 +116,9 @@ async function requestImage({ prompt, aspectRatio, key }) {
   url.searchParams.set("height", String(height));
   url.searchParams.set("seed", String(seed));
   url.searchParams.set("safe", "true");
+  // Classic image.pollinations.ai supports enhance=true. The gen image route
+  // does not document it, so the query is sent only on the classic URL.
+  if (enhance && !keyed) url.searchParams.set("enhance", "true");
   if (keyed) url.searchParams.set("model", pollinationsModel());
 
   if (key && url.toString().includes(key)) {
@@ -172,7 +175,7 @@ export const pollinationsProvider = {
   get maxCount() {
     return pollinationsApiKey() ? 10 : 1;
   },
-  async generateImage({ prompt, aspectRatio, n }) {
+  async generateImage({ prompt, aspectRatio, n, enhance }) {
     const count = Math.max(1, Number(n) || 1);
     const key = pollinationsApiKey();
     if (!key && count > 1) {
@@ -187,7 +190,7 @@ export const pollinationsProvider = {
     }
     const images = [];
     for (let i = 0; i < count; i += 1) {
-      images.push(await requestImage({ prompt, aspectRatio, key }));
+      images.push(await requestImage({ prompt, aspectRatio, key, enhance: Boolean(enhance) }));
     }
     return { images };
   },

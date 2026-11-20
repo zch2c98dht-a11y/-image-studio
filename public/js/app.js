@@ -95,7 +95,7 @@ function applyVideoLock() {
       parts.push(
         config.pollinationsKeyed
           ? "النموذج المجاني flux مفعّل بمفتاح الخادم، وحتى 1024 بكسل. المدير يستطيع أكثر من صورة في الطلب."
-          : "المزود المجاني: صورة واحدة كل 45 ثانية تقريباً، وأكبر حجم 768 بكسل.",
+          : "المزود المجاني: صورة واحدة كل 45 ثانية تقريباً، وأكبر حجم 1024 بكسل.",
       );
     }
     els.composerHint.textContent = parts.join(" ");
@@ -129,6 +129,7 @@ function renderGallery(items) {
       ${media}
       <div class="tile-body">
         <p>${escapeHtml(item.prompt || "")}</p>
+        ${item.promptEn && item.promptEn !== item.prompt ? `<p class="prompt-en">${escapeHtml(item.promptEn)}</p>` : ""}
         <a href="${item.url}?download=1" download>تنزيل</a>
       </div>
     `;

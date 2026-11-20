@@ -15,6 +15,7 @@ export const PRIVATE_MODE_MESSAGE = "التطبيق خاص حالياً، صنع
 
 export const DEFAULT_SETTINGS = {
   privateMode: true,
+  enhancePrompts: true,
   imageEnabled: true,
   videoEnabled: false,
   dailyImageLimit: 10,
@@ -73,6 +74,7 @@ export function getSettings() {
 export function updateSettings(patch) {
   const next = { ...getSettings(), ...patch };
   if (typeof next.privateMode !== "boolean") next.privateMode = !!next.privateMode;
+  if (typeof next.enhancePrompts !== "boolean") next.enhancePrompts = !!next.enhancePrompts;
   if (typeof next.imageEnabled !== "boolean") next.imageEnabled = !!next.imageEnabled;
   if (typeof next.videoEnabled !== "boolean") next.videoEnabled = !!next.videoEnabled;
   for (const key of ["dailyImageLimit", "dailyVideoLimit", "maxCount", "defaultDuration"]) {

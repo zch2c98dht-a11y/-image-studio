@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import { moderatePrompt, moderationPolicyNote } from "./moderation.js";
+import { finalizePrompt } from "./prompt-prep.js";
 import { getProvider, providerName } from "./providers/index.js";
 import {
   attachSession,
@@ -53,12 +54,6 @@ function redactSecrets(text) {
     if (secret) out = out.split(secret).join("[redacted]");
   }
   return out;
-}
-
-function stylePrompt(prompt, style) {
-  const s = String(style || "").trim();
-  if (!s) return prompt;
-  return `${prompt}\n\nArt style: ${s}.`;
 }
 
 function validateOptions(body, settings) {
@@ -169,7 +164,37 @@ app.post("/api/generate", async (req, res) => {
     return res.status(403).json({ ok: false, error: err.message, reason: err.code });
   }
 
-  const fullPrompt = stylePrompt(prompt, options.style);
+  const prepared = await finalizePrompt({
+    prompt,
+    style: options.style,
+    enhance: settings.enhancePrompts !== false,
+  });
+  if (!prepared.ok) {
+    logUsage({
+      id: crypto.randomUUID(),
+      sessionId: req.sessionId,
+      isAdmin: req.isAdmin,
+      type: options.type,
+      prompt,
+      style: options.style,
+      aspectRatio: options.aspectRatio,
+      resolution: options.resolution,
+      count: options.count,
+      duration: options.type === "video" ? options.duration : null,
+      status: "blocked",
+      reason: prepared.moderation.reason,
+      message: prepared.moderation.message,
+    });
+    return res.status(400).json({
+      ok: false,
+      error: prepared.moderation.message,
+      reason: prepared.moderation.reason,
+      policy: moderationPolicyNote(),
+    });
+  }
+
+  const fullPrompt = prepared.providerPrompt;
+  const promptEn = prepared.promptEn && prepared.promptEn !== prompt ? prepared.promptEn : null;
   const started = Date.now();
 
   try {
@@ -182,6 +207,7 @@ app.post("/api/generate", async (req, res) => {
         aspectRatio: options.aspectRatio,
         resolution: options.resolution,
         n: options.count,
+        enhance: settings.enhancePrompts !== false,
       });
       for (const image of result.images) {
         const file = writeMedia(image.buffer, image.ext || "jpg");
@@ -191,6 +217,7 @@ app.post("/api/generate", async (req, res) => {
           url: file.url,
           mimeType: image.mimeType,
           prompt,
+          promptEn,
           style: options.style,
           aspectRatio: options.aspectRatio,
           resolution: options.resolution,
@@ -201,6 +228,7 @@ app.post("/api/generate", async (req, res) => {
     } else {
       const result = await provider.generateVideo({
         prompt: fullPrompt,
+        enhance: settings.enhancePrompts !== false,
         style: options.style,
         aspectRatio: options.aspectRatio,
         resolution: options.resolution,
@@ -213,6 +241,7 @@ app.post("/api/generate", async (req, res) => {
         url: file.url,
         mimeType: result.video.mimeType,
         prompt,
+        promptEn,
         style: options.style,
         aspectRatio: options.aspectRatio,
         resolution: options.resolution,
@@ -318,6 +347,7 @@ app.put("/api/admin/settings", requireAdmin, (req, res) => {
   try {
     const allowed = [
       "privateMode",
+      "enhancePrompts",
       "imageEnabled",
       "videoEnabled",
       "dailyImageLimit",

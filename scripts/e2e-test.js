@@ -22,6 +22,7 @@ const child = spawn(process.execPath, ["src/server.js"], {
     NODE_ENV: "test-run",
     XAI_API_KEY: "should-never-leak-to-browser",
     POLLINATIONS_API_KEY: "sk_test_pollinations_should-never-leak",
+    PROMPT_PREP: "off",
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -387,6 +388,7 @@ try {
     assert.equal(res.status, 200);
     assert.match(text, /لوحة الإدارة/);
     assert.match(text, /وضع خاص: المدير فقط يقدر يصنع صور/);
+    assert.match(text, /تحسين الوصف تلقائياً/);
   });
 
   await check("admin login rejects wrong password", async () => {
@@ -552,6 +554,7 @@ try {
       DATA_DIR: dir,
       SESSION_SECRET: "test-session-secret-not-for-production",
       NODE_ENV: "production",
+      PROMPT_PREP: "off",
     };
     let first;
     let second;

@@ -62,15 +62,48 @@ try {
     assert.equal(parsed.pathname.startsWith("/text/"), true);
     assert.match(parsed.searchParams.get("system"), /highly detailed/);
     assert.match(parsed.searchParams.get("system"), /lighting/);
-    assert.match(parsed.searchParams.get("system"), /anime characters/);
+    assert.match(parsed.searchParams.get("system"), /franchise name/);
+    assert.match(parsed.searchParams.get("system"), /Masashi Kishimoto art style/);
+    assert.match(parsed.searchParams.get("system"), /hair color, eyes/);
+    assert.match(parsed.searchParams.get("system"), /two characters are fighting/);
     assert.match(decodeURIComponent(parsed.pathname), /ناروتو/);
-    assert.equal(parsed.searchParams.get("model"), "openai/gpt-5-nano");
+    assert.equal(parsed.searchParams.get("model"), "openai");
     assert.equal(calls[0].url.includes(secret), false);
     assert.equal(calls[0].options.headers.Authorization, `Bearer ${secret}`);
     assert.match(prepared.promptEn, /Naruto/);
     assert.match(prepared.providerPrompt, /highly detailed, sharp focus, high resolution/);
     assert.equal(prepared.providerPrompt.includes(secret), false);
-    assert.equal(prepared.source, "pollinations");
+    assert.equal(prepared.source, "llm");
+  });
+
+  await check("non-2xx model response retries once with openai-fast", async () => {
+    process.env.POLLINATIONS_API_KEY = secret;
+    const models = [];
+    const logs = [];
+    const originalLog = console.log;
+    console.log = (...args) => logs.push(args.join(" "));
+    try {
+      const prepared = await prepareImagePrompt({
+        prompt: "ناروتو يقاتل ساسكي",
+        enhance: true,
+        fetchImpl: async (url) => {
+          const parsed = new URL(String(url));
+          models.push(parsed.searchParams.get("model"));
+          assert.equal(String(url).includes(secret), false);
+          if (models.length === 1) return textResponse("missing", 404, "application/json");
+          return textResponse(
+            "Naruto and Sasuke fighting, Naruto anime, Masashi Kishimoto art style, highly detailed, sharp focus, high resolution",
+          );
+        },
+      });
+      assert.deepEqual(models, ["openai", "openai-fast"]);
+      assert.equal(prepared.source, "llm");
+      assert.match(prepared.promptEn, /Naruto and Sasuke/);
+      assert.equal(logs.some((line) => line === "prompt-prep path=llm"), true);
+      assert.equal(logs.some((line) => line.includes(secret)), false);
+    } finally {
+      console.log = originalLog;
+    }
   });
 
   await check("English prompts are enhanced too", async () => {
@@ -142,9 +175,10 @@ try {
         throw new Error("unexpected host");
       },
     });
-    assert.deepEqual(hosts, ["gen.pollinations.ai", "translate.googleapis.com"]);
-    assert.equal(prepared.promptEn, "Naruto the ninja");
-    assert.equal(prepared.source, "keyless");
+    assert.deepEqual(hosts, ["gen.pollinations.ai", "gen.pollinations.ai", "translate.googleapis.com"]);
+    assert.equal(prepared.promptEn, "Naruto the ninja, highly detailed, sharp focus, high resolution");
+    assert.equal(prepared.source, "gtx");
+    assert.match(prepared.providerPrompt, /highly detailed, sharp focus, high resolution/);
     assert.equal(prepared.providerPrompt.includes(secret), false);
   });
 
@@ -166,8 +200,8 @@ try {
         throw new Error(`unexpected ${host}`);
       },
     });
-    assert.equal(prepared.promptEn, "Naruto");
-    assert.equal(prepared.source, "keyless");
+    assert.equal(prepared.promptEn, "Naruto, highly detailed, sharp focus, high resolution");
+    assert.equal(prepared.source, "mymemory");
 
     const failed = await prepareImagePrompt({
       prompt: "ناروتو",

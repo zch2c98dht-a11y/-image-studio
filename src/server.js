@@ -264,7 +264,7 @@ app.post("/api/generate", async (req, res) => {
       count: items.length,
       duration: options.type === "video" ? options.duration : null,
       status: "ok",
-      message: `provider=${providerName()}; ms=${Date.now() - started}`,
+      message: `provider=${providerName()}; promptPath=${prepared.source}; ms=${Date.now() - started}`,
     });
 
     res.json({

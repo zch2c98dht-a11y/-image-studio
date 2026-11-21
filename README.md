@@ -66,7 +66,7 @@ PROVIDER=mock ADMIN_PASSWORD=change-me-before-deploy npm test
 | `ADMIN_PASSWORD` | كلمة سر `/admin` |
 | `POLLINATIONS_API_KEY` | اختياري. مفتاح سري على الخادم فقط. إذا وُجد يُستخدم `gen.pollinations.ai` مع النموذج المجاني `flux`. لا يُرسل للمتصفح ولا يُكتب في الرابط |
 | `POLLINATIONS_MODEL` | اختياري. الافتراضي `flux` (مجاني). القيم المسموحة: `flux` أو `black-forest-labs/flux.1-schnell` |
-| `POLLINATIONS_TEXT_MODEL` | اختياري. نموذج النص المجاني لترجمة الوصف وتحسينه. الافتراضي `openai/gpt-5-nano` |
+| `POLLINATIONS_TEXT_MODEL` | اختياري. نموذج النص المجاني لترجمة الوصف وتحسينه. الافتراضي الاسم المستعار `openai`. إذا فشل يُعاد المحاولة مرة بـ `openai-fast` |
 | `XAI_API_KEY` | مفتاح xAI إذا اخترت المزود المدفوع. يبقى على الخادم ولا يُرسل للمتصفح |
 | `SESSION_SECRET` | لتوقيع جلسة المدير |
 | `XAI_IMAGE_MODEL` | افتراضي `grok-imagine-image-2.0` |

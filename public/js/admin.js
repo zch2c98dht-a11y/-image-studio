@@ -38,6 +38,16 @@ function listFrom(text) {
 function fillSettings(settings) {
   document.getElementById("privateMode").checked = settings.privateMode !== false;
   document.getElementById("enhancePrompts").checked = settings.enhancePrompts !== false;
+  const modelSelect = document.getElementById("imageModel");
+  const choices = settings.imageModelChoices || [{ id: "auto", label: "تلقائي" }];
+  modelSelect.innerHTML = "";
+  for (const choice of choices) {
+    const opt = document.createElement("option");
+    opt.value = choice.id;
+    opt.textContent = choice.id === "auto" ? "تلقائي" : choice.label || choice.id;
+    if (choice.id === (settings.imageModel || "auto")) opt.selected = true;
+    modelSelect.appendChild(opt);
+  }
   document.getElementById("imageEnabled").checked = !!settings.imageEnabled;
   document.getElementById("videoEnabled").checked = !!settings.videoEnabled;
   document.getElementById("dailyImageLimit").value = settings.dailyImageLimit;
@@ -150,6 +160,7 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
       body: JSON.stringify({
         privateMode: document.getElementById("privateMode").checked,
         enhancePrompts: document.getElementById("enhancePrompts").checked,
+        imageModel: document.getElementById("imageModel").value,
         imageEnabled: document.getElementById("imageEnabled").checked,
         videoEnabled: document.getElementById("videoEnabled").checked,
         dailyImageLimit: Number(document.getElementById("dailyImageLimit").value),

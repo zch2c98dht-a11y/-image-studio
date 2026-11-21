@@ -6,6 +6,7 @@ import express from "express";
 import { moderatePrompt, moderationPolicyNote } from "./moderation.js";
 import { finalizePrompt } from "./prompt-prep.js";
 import { getProvider, providerName } from "./providers/index.js";
+import { FREE_IMAGE_MODELS } from "./providers/pollinations.js";
 import {
   attachSession,
   checkAdminPassword,
@@ -208,6 +209,9 @@ app.post("/api/generate", async (req, res) => {
         resolution: options.resolution,
         n: options.count,
         enhance: settings.enhancePrompts !== false,
+        category: prepared.category,
+        imageModel: settings.imageModel,
+        negativePrompt: prepared.negativePrompt,
       });
       for (const image of result.images) {
         const file = writeMedia(image.buffer, image.ext || "jpg");
@@ -264,7 +268,7 @@ app.post("/api/generate", async (req, res) => {
       count: items.length,
       duration: options.type === "video" ? options.duration : null,
       status: "ok",
-      message: `provider=${providerName()}; promptPath=${prepared.source}; ms=${Date.now() - started}`,
+      message: `provider=${providerName()}; promptPath=${prepared.source}; imageCategory=${prepared.category || "general"}; ms=${Date.now() - started}`,
     });
 
     res.json({
@@ -340,7 +344,16 @@ app.get("/api/admin/me", (req, res) => {
 });
 
 app.get("/api/admin/settings", requireAdmin, (_req, res) => {
-  res.json({ ok: true, settings: getSettings() });
+  res.json({
+    ok: true,
+    settings: {
+      ...getSettings(),
+      imageModelChoices: [
+        { id: "auto", label: "تلقائي" },
+        ...FREE_IMAGE_MODELS.filter((item) => item.id !== "black-forest-labs/flux.1-schnell"),
+      ],
+    },
+  });
 });
 
 app.put("/api/admin/settings", requireAdmin, (req, res) => {

@@ -71,6 +71,9 @@ try {
     assert.equal(calls[0].url.includes(secret), false);
     assert.equal(calls[0].options.headers.Authorization, `Bearer ${secret}`);
     assert.match(prepared.promptEn, /Naruto/);
+    assert.match(prepared.promptEn, /Official anime screenshot/);
+    assert.match(prepared.promptEn, /Naruto Shippuden/);
+    assert.match(prepared.promptEn, /spiky blond hair/);
     assert.match(prepared.providerPrompt, /highly detailed, sharp focus, high resolution/);
     assert.equal(prepared.providerPrompt.includes(secret), false);
     assert.equal(prepared.source, "llm");
@@ -120,7 +123,7 @@ try {
         );
       },
     });
-    assert.match(system, /If it is not English, translate it first/);
+    assert.match(system, /If the user text is not English, translate it first/);
     assert.match(prepared.promptEn, /red bicycle/);
     assert.match(prepared.promptEn, /highly detailed, sharp focus, high resolution/);
   });
@@ -176,8 +179,10 @@ try {
       },
     });
     assert.deepEqual(hosts, ["gen.pollinations.ai", "gen.pollinations.ai", "translate.googleapis.com"]);
-    assert.equal(prepared.promptEn, "Naruto the ninja, highly detailed, sharp focus, high resolution");
+    assert.match(prepared.promptEn, /Naruto the ninja, highly detailed, sharp focus, high resolution/);
+    assert.match(prepared.promptEn, /Official anime screenshot/);
     assert.equal(prepared.source, "gtx");
+    assert.equal(prepared.category, "anime");
     assert.match(prepared.providerPrompt, /highly detailed, sharp focus, high resolution/);
     assert.equal(prepared.providerPrompt.includes(secret), false);
   });
@@ -200,7 +205,8 @@ try {
         throw new Error(`unexpected ${host}`);
       },
     });
-    assert.equal(prepared.promptEn, "Naruto, highly detailed, sharp focus, high resolution");
+    assert.match(prepared.promptEn, /Naruto, highly detailed, sharp focus, high resolution/);
+    assert.match(prepared.promptEn, /spiky blond hair/);
     assert.equal(prepared.source, "mymemory");
 
     const failed = await prepareImagePrompt({

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { pollinationsProvider, pollinationsSize } from "../src/providers/pollinations.js";
+import { pollinationsProvider, pollinationsSize, resolveImageModel, ANIME_MODEL } from "../src/providers/pollinations.js";
 
 const secret = "sk_test_pollinations_should-never-leak";
 const originalFetch = globalThis.fetch;
@@ -94,6 +94,42 @@ try {
     assert.equal(parsed.searchParams.get("width"), "1024");
     assert.equal(parsed.searchParams.get("height"), "1024");
     assert.equal(calls[0].includes("sk_"), false);
+  });
+
+  await check("anime prompts use FLUX 1.1 Pro and fall back to flux", async () => {
+    process.env.POLLINATIONS_API_KEY = secret;
+    delete process.env.POLLINATIONS_MODEL;
+    assert.equal(resolveImageModel({ category: "anime" }), ANIME_MODEL);
+    assert.equal(resolveImageModel({ category: "general" }), "flux");
+    assert.equal(resolveImageModel({ imageModel: "tongyi-mai/z-image-turbo" }), "tongyi-mai/z-image-turbo");
+    assert.equal(resolveImageModel({ imageModel: "openai/gpt-image-2", category: "anime" }), "flux");
+    const calls = [];
+    globalThis.fetch = async (url) => {
+      const parsed = new URL(String(url));
+      calls.push(parsed);
+      assert.equal(String(url).includes(secret), false);
+      if (parsed.searchParams.get("model") === ANIME_MODEL) {
+        return new Response(JSON.stringify({ error: "model unavailable" }), {
+          status: 404,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return pngResponse();
+    };
+    const result = await pollinationsProvider.generateImage({
+      prompt: "Naruto Uzumaki vs Sasuke Uchiha",
+      aspectRatio: "1:1",
+      n: 1,
+      category: "anime",
+      negativePrompt: "photorealistic, 3d render",
+    });
+    assert.equal(result.images.length, 1);
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].searchParams.get("model"), ANIME_MODEL);
+    assert.equal(calls[0].searchParams.get("negative_prompt"), "photorealistic, 3d render");
+    assert.equal(calls[1].searchParams.get("model"), "flux");
+    assert.equal(calls[1].searchParams.get("negative_prompt"), null);
+    assert.equal(result.model, "flux");
   });
 
   await check("keyless provider rejects multiple images before any request", async () => {

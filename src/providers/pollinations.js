@@ -19,7 +19,19 @@ const GEN_BASE = "https://gen.pollinations.ai/image";
 const CLASSIC_MAX_EDGE = 1024;
 const KEYED_MAX_EDGE = 1024;
 const DEFAULT_MODEL = "flux";
-const FREE_MODELS = new Set(["flux", "black-forest-labs/flux.1-schnell"]);
+// First-party models with paid_only:false on GET /image/models (2026-11-21).
+// Anime routing uses FLUX 1.1 Pro: better prompt adherence than schnell, not a community model.
+export const ANIME_MODEL = "black-forest-labs/flux.1.1-pro";
+export const FREE_IMAGE_MODELS = [
+  { id: "flux", label: "FLUX schnell" },
+  { id: "black-forest-labs/flux.1-schnell", label: "FLUX schnell (id)" },
+  { id: ANIME_MODEL, label: "FLUX 1.1 Pro" },
+  { id: "black-forest-labs/flux.2-flex", label: "FLUX.2 Flex" },
+  { id: "black-forest-labs/flux.2-klein-4b", label: "FLUX.2 Klein 4B" },
+  { id: "tongyi-mai/z-image-turbo", label: "Z-Image Turbo" },
+  { id: "microsoft/mai-image-2.6", label: "MAI Image 2.6" },
+];
+const FREE_MODELS = new Set(FREE_IMAGE_MODELS.map((item) => item.id));
 
 const RATIOS = {
   "1:1": [1, 1],
@@ -38,11 +50,18 @@ export function pollinationsApiKey() {
 export function pollinationsModel() {
   const requested = String(process.env.POLLINATIONS_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
   if (!FREE_MODELS.has(requested)) {
-    const err = new Error("يُستخدم النموذج المجاني flux فقط. لا يُختار نموذج مدفوع.");
+    const err = new Error("يُستخدم نموذج مجاني فقط. لا يُختار نموذج مدفوع.");
     err.code = "not_configured";
     throw err;
   }
   return requested;
+}
+
+export function resolveImageModel({ category, imageModel } = {}) {
+  const override = String(imageModel || "auto").trim() || "auto";
+  if (override !== "auto") return FREE_MODELS.has(override) ? override : DEFAULT_MODEL;
+  if (category === "anime") return ANIME_MODEL;
+  return pollinationsModel();
 }
 
 export function pollinationsSize(aspectRatio, { keyed = false } = {}) {
@@ -106,8 +125,28 @@ function randomSeed() {
   return Math.floor(Math.random() * 1_000_000_000);
 }
 
-async function requestImage({ prompt, aspectRatio, key, enhance }) {
+async function requestImage({ prompt, aspectRatio, key, enhance, model, negativePrompt }) {
   const keyed = Boolean(key);
+  const chosen = resolveImageModel({ imageModel: model });
+  try {
+    return await requestImageOnce({ prompt, aspectRatio, key, enhance, model: chosen, negativePrompt, keyed });
+  } catch (err) {
+    if (chosen !== DEFAULT_MODEL && err.status && err.status !== 401) {
+      return requestImageOnce({
+        prompt,
+        aspectRatio,
+        key,
+        enhance,
+        model: DEFAULT_MODEL,
+        negativePrompt: "",
+        keyed,
+      });
+    }
+    throw err;
+  }
+}
+
+async function requestImageOnce({ prompt, aspectRatio, key, enhance, model, negativePrompt, keyed }) {
   const { width, height } = pollinationsSize(aspectRatio, { keyed: keyed || Boolean(enhance) });
   const seed = randomSeed();
   const base = keyed ? GEN_BASE : CLASSIC_BASE;
@@ -119,7 +158,8 @@ async function requestImage({ prompt, aspectRatio, key, enhance }) {
   // Classic image.pollinations.ai supports enhance=true. The gen image route
   // does not document it, so the query is sent only on the classic URL.
   if (enhance && !keyed) url.searchParams.set("enhance", "true");
-  if (keyed) url.searchParams.set("model", pollinationsModel());
+  if (keyed || (model && model !== DEFAULT_MODEL)) url.searchParams.set("model", model);
+  if (negativePrompt) url.searchParams.set("negative_prompt", negativePrompt);
 
   if (key && url.toString().includes(key)) {
     const err = new Error("تعذر إنشاء الطلب بدون كشف المفتاح.");
@@ -166,7 +206,7 @@ async function requestImage({ prompt, aspectRatio, key, enhance }) {
   }
   const mimeType = ctype.split(";")[0].trim() || "image/jpeg";
   const ext = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
-  return { buffer, mimeType, ext };
+  return { buffer, mimeType, ext, model };
 }
 
 export const pollinationsProvider = {
@@ -175,9 +215,10 @@ export const pollinationsProvider = {
   get maxCount() {
     return pollinationsApiKey() ? 10 : 1;
   },
-  async generateImage({ prompt, aspectRatio, n, enhance }) {
+  async generateImage({ prompt, aspectRatio, n, enhance, category, imageModel, negativePrompt }) {
     const count = Math.max(1, Number(n) || 1);
     const key = pollinationsApiKey();
+    const model = resolveImageModel({ category, imageModel });
     if (!key && count > 1) {
       const err = new Error("المزود المجاني ينشئ صورة واحدة في كل طلب، وبفاصل حوالي 45 ثانية.");
       err.code = "limit";
@@ -189,10 +230,20 @@ export const pollinationsProvider = {
       throw err;
     }
     const images = [];
+    let used = model;
     for (let i = 0; i < count; i += 1) {
-      images.push(await requestImage({ prompt, aspectRatio, key, enhance: Boolean(enhance) }));
+      const image = await requestImage({
+        prompt,
+        aspectRatio,
+        key,
+        enhance: Boolean(enhance),
+        model,
+        negativePrompt,
+      });
+      used = image.model || used;
+      images.push(image);
     }
-    return { images };
+    return { images, model: used };
   },
   async generateVideo() {
     const err = new Error("الفيديو غير متاح على مزود Pollinations. قريباً، أو فعّل مزوداً يدعم الفيديو مثل xAI.");

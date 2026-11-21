@@ -78,6 +78,7 @@ PROVIDER=mock ADMIN_PASSWORD=change-me-before-deploy npm test
 
 - بدون مفتاح: `GET https://image.pollinations.ai/prompt/{الوصف المرمّز}` مع `width` و`height` و`seed` و`safe=true` و`enhance=true` عندما يكون تحسين الوصف مفعّلاً. صورة واحدة كل 45 ثانية تقريباً، وأطول ضلع 1024.
 - الوصف العربي أو أي وصف بغير الحروف اللاتينية يُترجم إلى الإنجليزية قبل المزود. ومع «تحسين الوصف تلقائياً» (الافتراضي) تُعاد صياغته في نفس الطلب إلى وصف إنجليزي مفصل. إذا فشلت الترجمة يُستخدم النص الأصلي، ولا يتوقف الإنشاء.
+- إذا صنّف المحسّن الوصف كأنمي أو كرتون، تُستخدم `black-forest-labs/flux.1.1-pro` (مجاني، `paid_only: false`) بدل `flux`. يمكن تثبيت النموذج من لوحة الإدارة. إذا رفض المزود النموذج يُعاد الطلب بـ `flux`.
 - مع `POLLINATIONS_API_KEY`: `GET https://gen.pollinations.ai/image/{الوصف المرمّز}` وترويسة `Authorization: Bearer`. المفتاح لا يوضع في الرابط. النموذج الافتراضي المجاني هو `flux`، والحجم حتى 1024، والمدير يستطيع عدة صور في الطلب (طلب لكل صورة لأن الواجهة تقبل صورة واحدة في كل استدعاء). أخطاء JSON مثل 401 و402 لا تُحفظ كصور.
 - المصدر: [وثائق gen.pollinations.ai](https://gen.pollinations.ai/docs) و[APIDOCS.md](https://github.com/pollinations/pollinations/blob/master/APIDOCS.md).
 

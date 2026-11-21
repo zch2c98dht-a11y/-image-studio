@@ -19,7 +19,24 @@ const TRANSLATE_SYSTEM =
   "Translate to a concise English image prompt; output only the prompt; keep names like anime characters recognizable.";
 
 const ENHANCE_SYSTEM =
-  "Rewrite the user text into one detailed, high-quality English image prompt. If it is not English, translate it first. Keep the user's intent and recognizable names. If the subject is a known anime, cartoon, or game character, explicitly add the franchise name, the art style (for example: anime style, Masashi Kishimoto art style), and the character's signature visual traits (outfit, hair color, eyes) so the image model draws them correctly. If two characters are fighting, describe both characters and the action. Include subject details, visual style, lighting, and composition. End with these quality tags: highly detailed, sharp focus, high resolution. Output only the prompt, with no quotes or explanation.";
+  "First line must be exactly CATEGORY: anime or CATEGORY: general. Use anime for anime, cartoon, manga, or game characters. Otherwise general. Then a blank line and one detailed English image prompt. If the user text is not English, translate it first. Keep the user's intent and recognizable names. If the subject is a known anime, cartoon, or game character, explicitly add the franchise name, the art style (for example: anime style, Masashi Kishimoto art style), and the character's signature visual traits (outfit, hair color, eyes) so the image model draws them correctly. If two characters are fighting, describe both characters and the action. Include subject details, visual style, lighting, and composition. End with these quality tags: highly detailed, sharp focus, high resolution. Output only the category line and the prompt, with no quotes or explanation.";
+
+const ANIME_HINTS =
+  /ناروتو|ساسوكي|ساسكي|انمي|أنمي|مانجا|كرتون|naruto|sasuke|uchiha|shippuden|anime|manga|cartoon|ghibli|one piece|dragon ball|pokemon|pikachu|goku|luffy|zelda|mario|sonic/i;
+
+const CHARACTER_TRAITS = [
+  {
+    re: /naruto|ناروتو/i,
+    text: "Naruto Uzumaki: spiky blond hair, blue eyes, whisker marks on the cheeks, orange and black jumpsuit, Leaf Village headband",
+  },
+  {
+    re: /sasuke|ساسوكي|ساسكي|uchiha/i,
+    text: "Sasuke Uchiha: black spiky hair, Sharingan red eyes, dark blue outfit",
+  },
+];
+
+export const ANIME_NEGATIVE =
+  "photorealistic, 3d render, realistic skin, generic face, wrong hair color, western cartoon, blurry";
 
 export function hasNonLatinLetters(text) {
   for (const ch of String(text || "")) {
@@ -30,6 +47,47 @@ export function hasNonLatinLetters(text) {
 
 export function hasArabicLetters(text) {
   return /\p{Script=Arabic}/u.test(String(text || ""));
+}
+
+export function parseCategoryPrompt(text) {
+  const raw = String(text || "").trim();
+  const match = raw.match(/^CATEGORY:\s*(anime|cartoon|general)\b[^\n]*\n?/i);
+  if (!match) return { category: "general", prompt: raw };
+  const category = /general/i.test(match[1]) ? "general" : "anime";
+  const prompt = raw.slice(match[0].length).trim();
+  return { category, prompt: prompt || raw };
+}
+
+export function inferAnime(text) {
+  return ANIME_HINTS.test(String(text || ""));
+}
+
+function franchiseOf(...parts) {
+  const blob = parts.join("\n");
+  if (/naruto|sasuke|uchiha|shippuden|ناروتو|ساسوكي|ساسكي/i.test(blob)) return "Naruto Shippuden";
+  if (/one piece|luffy/i.test(blob)) return "One Piece";
+  if (/dragon ball|goku/i.test(blob)) return "Dragon Ball";
+  if (/pokemon|pikachu/i.test(blob)) return "Pokémon";
+  if (/ghibli/i.test(blob)) return "Studio Ghibli";
+  if (/zelda/i.test(blob)) return "The Legend of Zelda";
+  return "the original series";
+}
+
+export function strengthenAnimePrompt(text, original = "") {
+  let out = String(text || "").trim();
+  if (!out) return out;
+  const franchise = franchiseOf(original, out);
+  const traits = CHARACTER_TRAITS.filter((item) => item.re.test(original) || item.re.test(out)).map((item) => item.text);
+  if (!/official anime screenshot/i.test(out)) {
+    out += `. Official anime screenshot, cel shading, studio key visual, exact character design from ${franchise}`;
+  }
+  for (const trait of traits) {
+    if (!out.includes(trait)) out += `. ${trait}`;
+  }
+  if (!/\bavoid\b/i.test(out)) {
+    out += ". Avoid: photorealism, 3d render, generic faces, wrong hair colors";
+  }
+  return out.replace(/\s+/g, " ").trim();
 }
 
 function apiKey() {
@@ -195,7 +253,13 @@ export async function prepareImagePrompt({
     logPrepPath(result.source);
     return result;
   };
-  const fallback = { providerPrompt: stylePrompt(original, style), promptEn: null, source: "original" };
+  const fallback = {
+    providerPrompt: stylePrompt(original, style),
+    promptEn: null,
+    source: "original",
+    category: inferAnime(original) ? "anime" : "general",
+    negativePrompt: inferAnime(original) ? ANIME_NEGATIVE : "",
+  };
   if (!original || process.env.PROMPT_PREP === "off") return finish(fallback);
 
   const nonLatin = hasNonLatinLetters(original);
@@ -232,9 +296,18 @@ export async function prepareImagePrompt({
   }
 
   if (!rewritten) return finish(fallback);
-  const shown = wantEnhance && (source === "gtx" || source === "mymemory") ? withQualitySuffix(rewritten) : rewritten;
+  const parsed = parseCategoryPrompt(rewritten);
+  let shown = wantEnhance && (source === "gtx" || source === "mymemory") ? withQualitySuffix(parsed.prompt) : parsed.prompt;
+  const category = inferAnime(original) || inferAnime(shown) || parsed.category === "anime" ? "anime" : "general";
+  if (category === "anime" && wantEnhance) shown = strengthenAnimePrompt(shown, original);
   const providerPrompt = source === "llm" && wantEnhance ? shown : stylePrompt(shown, style);
-  return finish({ providerPrompt, promptEn: shown, source });
+  return finish({
+    providerPrompt,
+    promptEn: shown,
+    source,
+    category,
+    negativePrompt: category === "anime" ? ANIME_NEGATIVE : "",
+  });
 }
 
 export async function finalizePrompt(options) {

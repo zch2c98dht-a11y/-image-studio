@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getProvider, providerName } from "./providers/index.js";
+import { FREE_IMAGE_MODELS } from "./providers/pollinations.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const DATA_DIR = process.env.DATA_DIR || path.join(root, "data");
@@ -16,6 +17,7 @@ export const PRIVATE_MODE_MESSAGE = "التطبيق خاص حالياً، صنع
 export const DEFAULT_SETTINGS = {
   privateMode: true,
   enhancePrompts: true,
+  imageModel: "auto",
   imageEnabled: true,
   videoEnabled: false,
   dailyImageLimit: 10,
@@ -75,6 +77,8 @@ export function updateSettings(patch) {
   const next = { ...getSettings(), ...patch };
   if (typeof next.privateMode !== "boolean") next.privateMode = !!next.privateMode;
   if (typeof next.enhancePrompts !== "boolean") next.enhancePrompts = !!next.enhancePrompts;
+  const modelIds = new Set(["auto", ...FREE_IMAGE_MODELS.map((item) => item.id)]);
+  if (!modelIds.has(next.imageModel)) next.imageModel = "auto";
   if (typeof next.imageEnabled !== "boolean") next.imageEnabled = !!next.imageEnabled;
   if (typeof next.videoEnabled !== "boolean") next.videoEnabled = !!next.videoEnabled;
   for (const key of ["dailyImageLimit", "dailyVideoLimit", "maxCount", "defaultDuration"]) {
@@ -304,6 +308,8 @@ export function publicConfig(sessionId, isAdmin) {
     maxCount,
     quota: { ...quota, maxCount },
     provider: providerName(),
+    imageModel: settings.imageModel || "auto",
+    imageModelChoices: [{ id: "auto", label: "تلقائي" }, ...FREE_IMAGE_MODELS.filter((item) => item.id !== "black-forest-labs/flux.1-schnell")],
     pollinationsKeyed: provider.id === "pollinations" && Boolean(String(process.env.POLLINATIONS_API_KEY || "").trim()),
     policy:
       "سياسة المحتوى تُطبَّق على الجميع. وضع المدير يرفع حدود الاستخدام فقط ولا يتجاوز قواعد المحتوى أو مزود الذكاء الاصطناعي.",
